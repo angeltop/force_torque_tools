@@ -45,9 +45,11 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <sensor_msgs/Imu.h>
-#include <moveit/move_group_interface/move_group.h>
+// #include <moveit/move_group_interface/move_group.h>
 #include <force_torque_sensor_calib/ft_calib.h>
 #include <eigen3/Eigen/Core>
+#include <sarafun_msgs/CommandedPoseAction.h>
+#include <actionlib/client/simple_action_client.h>
 
 using namespace Calibration;
 
@@ -69,7 +71,7 @@ public:
 		spinner->start();
 
 
-
+		
 		topicSub_ft_raw_ = n_.subscribe("ft_raw", 1, &FTCalibNode::topicCallback_ft_raw, this);
 		topicSub_Accelerometer_ = n_.subscribe("imu", 1, &FTCalibNode::topicCallback_imu, this);
 
@@ -89,7 +91,6 @@ public:
 	{
 		saveCalibData();
 		delete spinner;
-		delete m_group;
 		delete m_ft_calib;
 		delete m_tf_listener;
 	}
@@ -98,19 +99,18 @@ public:
 	bool getROSParameters()
 	{
 
-		// Get the moveit group name
-		if(n_.hasParam("moveit_group_name"))
+		// Get the name of motion action server
+		if(n_.hasParam("motion_server"))
 		{
-			n_.getParam("moveit_group_name", m_moveit_group_name);
+			n_.getParam("motion_server", m_server_name);
 		}
 
 		else
 		{
-			ROS_ERROR("No moveit_group_name parameter, shutting down node...");
-			n_.shutdown();
-			return false;
+			ROS_WARN("No motion_server parameter, setting to default '/cmd_pose_server_left'");
+			m_server_name = std::string("/cmd_pose_server_left");
 		}
-
+		
 		// Get the name of output calibration file
 		if(n_.hasParam("calib_file_name"))
 		{
@@ -215,17 +215,17 @@ public:
     // connects to the move arm servers
 	void init()
 	{
-		m_group = new move_group_interface::MoveGroup(m_moveit_group_name);
+		m_motionClient_ = new actionlib::SimpleActionClient<sarafun_msgs::CommandedPoseAction>(n_, m_server_name);
 	}
 
 
 	// Calibrates the FT sensor by putting the arm in several different positions
 	bool moveNextPose()
 	{
-
+		sarafun_msgs::CommandedPoseGoal goal;
 		std::stringstream ss;
 		ss << m_pose_counter;
-		Eigen::Matrix<double, 6, 1> pose;
+		Eigen::Matrix<double, 7, 1> pose;
 
 		// either find poses from the parameter server
 		// poses should be in "pose%d" format (e.g. pose0, pose1, pose2 ...)
@@ -234,7 +234,7 @@ public:
 		{
 			if(!getPose("pose"+ss.str(), pose))
 			{
-				ROS_INFO("Finished group %s poses", m_group->getName().c_str());
+				ROS_INFO("Finished group poses");
 				m_finished = true;
 				return true;
 			}
@@ -244,45 +244,43 @@ public:
 			pose_.position.y = pose(1);
 			pose_.position.z = pose(2);
 
-			tf::Quaternion q;
-			q.setRPY((double)pose(3), (double)pose(4), (double)pose(5));
-
-			tf::quaternionTFToMsg(q, pose_.orientation);
+			pose_.orientation.x = pose(3);
+			pose_.orientation.y = pose(4);
+			pose_.orientation.z = pose(5);
+			pose_.orientation.w = pose(6);
 
 			geometry_msgs::PoseStamped pose_stamped;
 			pose_stamped.pose = pose_;
 			pose_stamped.header.frame_id = m_poses_frame_id;
 			pose_stamped.header.stamp = ros::Time::now();
 
-			m_group->setPoseTarget(pose_stamped);
+// 			m_group->setPoseTarget(pose_stamped);
+			
+			goal.target = pose_stamped;
+			m_motionClient_->sendGoal(goal);
+			ROS_INFO("Requesting motion %d", m_pose_counter);
+			m_motionClient_->waitForResult(ros::Duration(15.0));
 
 		}
 		else // or execute random poses
 		{
-			if(m_pose_counter<m_number_random_poses)
-			{
-				m_group->setRandomTarget();
-				ROS_INFO("Executing pose %d",m_pose_counter);
-			}
-
-			else
-			{
-				ROS_INFO("Finished group %s random poses", m_group->getName().c_str());
-				m_finished = true;
-				return true;
-			}
+			// not supported
+			ROS_ERROR("Random poses is not supported with omg!!!");
+			return false;
+			
 		}
 
 
 		m_pose_counter++;
-		m_group->move();
+// 		m_group->move();
+		ros::Duration(3.0).sleep();
 		ROS_INFO("Finished executing pose %d", m_pose_counter-1);
 		return true;
 	}
 
 	// gets the next pose from the parameter server
 	// pose in [x y z r p y] format ([m], [rad])
-	bool getPose(const std::string &pose_param_name, Eigen::Matrix<double, 6, 1> &pose)
+	bool getPose(const std::string &pose_param_name, Eigen::Matrix<double, 7, 1> &pose)
 	{
 		XmlRpc::XmlRpcValue PoseXmlRpc;
 		if(n_.hasParam(pose_param_name))
@@ -296,13 +294,13 @@ public:
 			return false;
 		}
 
-		if(PoseXmlRpc.size()!=6)
+		if(PoseXmlRpc.size()!=7)
 		{
-			ROS_ERROR("Pose parameter %s wrong size (must be 6)", pose_param_name.c_str());
+			ROS_ERROR("Pose parameter %s wrong size (must be 7)", pose_param_name.c_str());
 			return false;
 		}
 
-		for(unsigned int i=0; i<6; i++)
+		for(unsigned int i=0; i<7; i++)
 			pose(i) = (double)PoseXmlRpc[i];
 
 		return true;
@@ -499,7 +497,7 @@ public:
 
 private:
 
-	move_group_interface::MoveGroup *m_group;
+	actionlib::SimpleActionClient<sarafun_msgs::CommandedPoseAction> *m_motionClient_;
 
 	unsigned int m_pose_counter;
 	unsigned int m_ft_counter;
@@ -522,9 +520,9 @@ private:
 	tf::TransformListener *m_tf_listener;
 
 	//	***** ROS parameters ***** //
-	// name of the moveit group
-	std::string m_moveit_group_name;
-
+	
+	// motion action server name of arm 
+	std::string m_server_name;
 	// name of output calibration file
 	std::string m_calib_file_name;
 
@@ -594,39 +592,39 @@ int main(int argc, char **argv)
 		else if ((ros::Time::now() - t_end_move_arm).toSec() > wait_time)
 		{
 			n_measurements++;
-			ft_calib_node.averageFTMeas(); // average over 100 measurements;
+			//ft_calib_node.averageFTMeas(); // average over 100 measurements;
 
 			if(n_measurements==100)
 			{
 				ret = false;
 				n_measurements = 0;
 
-				ft_calib_node.addMeasurement(); // stacks up measurement matrices and FT measurementsa
+				//ft_calib_node.addMeasurement(); // stacks up measurement matrices and FT measurementsa
 				double mass;
 				Eigen::Vector3d COM_pos;
 				Eigen::Vector3d f_bias;
 				Eigen::Vector3d t_bias;
 
-				ft_calib_node.getCalib(mass, COM_pos, f_bias, t_bias);
-				std::cout << "-------------------------------------------------------------" << std::endl;
-				std::cout << "Current calibration estimate:" << std::endl;
-				std::cout << std::endl << std::endl;
-
-				std::cout << "Mass: " << mass << std::endl << std::endl;
-
-				std::cout << "Center of mass position (relative to FT sensor frame):" << std::endl;
-				std::cout << "[" << COM_pos(0) << ", " << COM_pos(1) << ", " << COM_pos(2) << "]";
-				std::cout << std::endl << std::endl;
-
-
-				std::cout << "FT bias: " << std::endl;
-				std::cout << "[" << f_bias(0) << ", " << f_bias(1) << ", " << f_bias(2) << ", ";
-				std::cout << t_bias(0) << ", " << t_bias(1) << ", " << t_bias(2) << "]";
-				std::cout << std::endl << std::endl;
-
-
-				std::cout << "-------------------------------------------------------------" << std::endl << std::endl << std::endl;
-				ft_calib_node.saveCalibData();
+// 				ft_calib_node.getCalib(mass, COM_pos, f_bias, t_bias);
+// 				std::cout << "-------------------------------------------------------------" << std::endl;
+// 				std::cout << "Current calibration estimate:" << std::endl;
+// 				std::cout << std::endl << std::endl;
+// 
+// 				std::cout << "Mass: " << mass << std::endl << std::endl;
+// 
+// 				std::cout << "Center of mass position (relative to FT sensor frame):" << std::endl;
+// 				std::cout << "[" << COM_pos(0) << ", " << COM_pos(1) << ", " << COM_pos(2) << "]";
+// 				std::cout << std::endl << std::endl;
+// 
+// 
+// 				std::cout << "FT bias: " << std::endl;
+// 				std::cout << "[" << f_bias(0) << ", " << f_bias(1) << ", " << f_bias(2) << ", ";
+// 				std::cout << t_bias(0) << ", " << t_bias(1) << ", " << t_bias(2) << "]";
+// 				std::cout << std::endl << std::endl;
+// 
+// 
+// 				std::cout << "-------------------------------------------------------------" << std::endl << std::endl << std::endl;
+// 				ft_calib_node.saveCalibData();
 			}
 
 		}

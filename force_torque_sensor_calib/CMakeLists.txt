@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(force_torque_sensor_calib)
 
-find_package(catkin REQUIRED COMPONENTS cmake_modules roscpp sensor_msgs tf geometry_msgs moveit_core moveit_ros_planning moveit_ros_planning_interface tf_conversions eigen_conversions)
+find_package(catkin REQUIRED COMPONENTS cmake_modules roscpp sensor_msgs tf geometry_msgs tf_conversions eigen_conversions sarafun_msgs)
 find_package(Eigen REQUIRED)
 find_package(Boost REQUIRED system filesystem date_time thread)
 
 catkin_package(
   DEPENDS eigen
-  CATKIN_DEPENDS roscpp sensor_msgs tf geometry_msgs moveit_core moveit_ros_planning moveit_ros_planning_interface eigen tf_conversions eigen_conversions
+  CATKIN_DEPENDS roscpp sensor_msgs tf geometry_msgs eigen tf_conversions eigen_conversions sarafun_msgs
   INCLUDE_DIRS include 
   LIBRARIES 
 )

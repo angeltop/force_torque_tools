@@ -1,0 +1,31 @@
+# main loop frequency [Hz] (should be as fast as F/T sensor publish frequency)
+loop_rate: 1000.0
+
+# waiting time after moving to each pose before taking F/T measurements
+wait_time: 3.0
+
+# Name of the moveit group
+motion_server: '/cmd_pose_server_right'
+
+# Name of the calib file
+calib_file_name: 'sarafun_right_arm_calib.yaml'
+
+# Name of the directory
+calib_file_dir: '~/.ros/ft_calib'
+
+# Name of file to store measurements
+meas_file_name: 'sarafun_right_arm_ft_calib_meas.txt'
+
+# Name of the directory
+meas_file_dir: '~/.ros/ft_calib'
+
+# don't execute random poses
+random_poses: false
+
+# number of random poses
+number_random_poses: 100
+
+# the poses to which to move the arm in order to calibrate the F/T sensor
+# format: [x y z r p y]  in meters, radians
+# poses_frame_id sets the frame at which the poses are expressed
+poses_frame_id: 'base_link'
