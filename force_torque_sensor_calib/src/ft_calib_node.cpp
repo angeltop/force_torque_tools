@@ -72,8 +72,8 @@ public:
 
 
 		
-		topicSub_ft_raw_ = n_.subscribe("ft_raw", 1, &FTCalibNode::topicCallback_ft_raw, this);
-		topicSub_Accelerometer_ = n_.subscribe("imu", 1, &FTCalibNode::topicCallback_imu, this);
+		topicSub_ft_raw_ = n_.subscribe("/ethdaq_data_neg", 1, &FTCalibNode::topicCallback_ft_raw, this);
+// 		topicSub_Accelerometer_ = n_.subscribe("imu", 1, &FTCalibNode::topicCallback_imu, this);
 
 		m_pose_counter = 0;
 		m_ft_counter = 0;
@@ -216,6 +216,12 @@ public:
 	void init()
 	{
 		m_motionClient_ = new actionlib::SimpleActionClient<sarafun_msgs::CommandedPoseAction>(n_, m_server_name);
+		m_motionClient_->waitForServer(ros::Duration(0.5));
+		while(!m_motionClient_->isServerConnected())
+		{
+			ROS_INFO_STREAM("Waiting for motion server to connect!!!");
+			m_motionClient_->waitForServer(ros::Duration(0.5));
+		}
 	}
 
 
@@ -273,7 +279,7 @@ public:
 
 		m_pose_counter++;
 // 		m_group->move();
-		ros::Duration(3.0).sleep();
+		ros::Duration(2.0).sleep();
 		ROS_INFO("Finished executing pose %d", m_pose_counter-1);
 		return true;
 	}
@@ -394,6 +400,7 @@ public:
 
 	void addMeasurement()
 	{
+		m_ft_avg.header.frame_id =  m_ft_raw.header.frame_id;
 
 		m_ft_avg.wrench.force.x = -m_ft_avg.wrench.force.x/(double)m_ft_counter;
 		m_ft_avg.wrench.force.y = -m_ft_avg.wrench.force.y/(double)m_ft_counter;
@@ -412,18 +419,22 @@ public:
 			return;
 		}
 
-		if(!m_received_imu)
-		{
-			ROS_ERROR("Haven't received accelerometer readings");
-			return;
-		}
+// 		if(!m_received_imu)
+// 		{
+// 			ROS_ERROR("Haven't received accelerometer readings");
+// 			return;
+// 		}
 
 		// express gravity vector in F/T sensor frame
 		geometry_msgs::Vector3Stamped gravity;
 		gravity.header.stamp = ros::Time();
-		gravity.header.frame_id = m_imu.header.frame_id;
-		gravity.vector = m_imu.linear_acceleration;
-
+		//gravity.header.frame_id = m_imu.header.frame_id;
+		//gravity.vector = m_imu.linear_acceleration;
+		gravity.header.frame_id = "base_link";
+		gravity.vector.x = 0.0;
+		gravity.vector.y = 0.0;
+		gravity.vector.z = -9.80665;
+		
 		geometry_msgs::Vector3Stamped gravity_ft_frame;
 
 		try
@@ -592,39 +603,39 @@ int main(int argc, char **argv)
 		else if ((ros::Time::now() - t_end_move_arm).toSec() > wait_time)
 		{
 			n_measurements++;
-			//ft_calib_node.averageFTMeas(); // average over 100 measurements;
+			ft_calib_node.averageFTMeas(); // average over 100 measurements;
 
 			if(n_measurements==100)
 			{
 				ret = false;
 				n_measurements = 0;
 
-				//ft_calib_node.addMeasurement(); // stacks up measurement matrices and FT measurementsa
+				ft_calib_node.addMeasurement(); // stacks up measurement matrices and FT measurementsa
 				double mass;
 				Eigen::Vector3d COM_pos;
 				Eigen::Vector3d f_bias;
 				Eigen::Vector3d t_bias;
 
-// 				ft_calib_node.getCalib(mass, COM_pos, f_bias, t_bias);
-// 				std::cout << "-------------------------------------------------------------" << std::endl;
-// 				std::cout << "Current calibration estimate:" << std::endl;
-// 				std::cout << std::endl << std::endl;
-// 
-// 				std::cout << "Mass: " << mass << std::endl << std::endl;
-// 
-// 				std::cout << "Center of mass position (relative to FT sensor frame):" << std::endl;
-// 				std::cout << "[" << COM_pos(0) << ", " << COM_pos(1) << ", " << COM_pos(2) << "]";
-// 				std::cout << std::endl << std::endl;
-// 
-// 
-// 				std::cout << "FT bias: " << std::endl;
-// 				std::cout << "[" << f_bias(0) << ", " << f_bias(1) << ", " << f_bias(2) << ", ";
-// 				std::cout << t_bias(0) << ", " << t_bias(1) << ", " << t_bias(2) << "]";
-// 				std::cout << std::endl << std::endl;
-// 
-// 
-// 				std::cout << "-------------------------------------------------------------" << std::endl << std::endl << std::endl;
-// 				ft_calib_node.saveCalibData();
+				ft_calib_node.getCalib(mass, COM_pos, f_bias, t_bias);
+				std::cout << "-------------------------------------------------------------" << std::endl;
+				std::cout << "Current calibration estimate:" << std::endl;
+				std::cout << std::endl << std::endl;
+
+				std::cout << "Mass: " << mass << std::endl << std::endl;
+
+				std::cout << "Center of mass position (relative to FT sensor frame):" << std::endl;
+				std::cout << "[" << COM_pos(0) << ", " << COM_pos(1) << ", " << COM_pos(2) << "]";
+				std::cout << std::endl << std::endl;
+
+
+				std::cout << "FT bias: " << std::endl;
+				std::cout << "[" << f_bias(0) << ", " << f_bias(1) << ", " << f_bias(2) << ", ";
+				std::cout << t_bias(0) << ", " << t_bias(1) << ", " << t_bias(2) << "]";
+				std::cout << std::endl << std::endl;
+
+
+				std::cout << "-------------------------------------------------------------" << std::endl << std::endl << std::endl;
+				ft_calib_node.saveCalibData();
 			}
 
 		}

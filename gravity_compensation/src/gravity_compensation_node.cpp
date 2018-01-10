@@ -65,10 +65,10 @@ public:
 		n_ = ros::NodeHandle("~");
 		m_g_comp_params  = new GravityCompensationParams();
 		m_g_comp = NULL;
-		m_received_imu = false;
+		m_received_imu = true;
 
 		// subscribe to accelerometer topic and raw F/T sensor topic
-		topicSub_imu_ = n_.subscribe("imu", 1, &GravityCompensationNode::topicCallback_imu, this);
+	//	topicSub_imu_ = n_.subscribe("imu", 1, &GravityCompensationNode::topicCallback_imu, this);
 		topicSub_ft_raw_ = n_.subscribe("ft_raw", 1, &GravityCompensationNode::topicCallback_ft_raw, this);
 
 		/// implementation of topics to publish
@@ -85,6 +85,11 @@ public:
 			topicPub_ft_zeroed_ = n_.advertise<geometry_msgs::WrenchStamped> ("ft_zeroed", 1);
 			topicPub_ft_compensated_ = n_.advertise<geometry_msgs::WrenchStamped> ("ft_compensated", 1);
 		}
+		m_imu.header.frame_id = "base_link";
+		m_imu.header.stamp = ros::Time::now();
+		m_imu.linear_acceleration.x = 0.0;
+		m_imu.linear_acceleration.y = 0.0;
+		m_imu.linear_acceleration.z = -9.80665;
 	}
 
 	~GravityCompensationNode()
@@ -236,13 +241,14 @@ public:
 	void topicCallback_imu(const sensor_msgs::Imu::ConstPtr &msg)
 	{
 		m_imu = *msg;
-		m_received_imu = true;
+// 		 = true;
 	}
 
 	void topicCallback_ft_raw(const geometry_msgs::WrenchStamped::ConstPtr &msg)
 	{
 		static int error_msg_count=0;
 
+		m_imu.header.stamp = ros::Time::now();
 		if(!m_received_imu)
 		{
 			return;
@@ -255,7 +261,7 @@ public:
 				ROS_ERROR("Imu reading too old, not able to g-compensate ft measurement");
 			return;
 		}
-
+		m_imu.header.stamp = ros::Time::now()-ros::Duration(0.1);
 		geometry_msgs::WrenchStamped ft_zeroed;
 		m_g_comp->Zero(*msg, ft_zeroed);
 		topicPub_ft_zeroed_.publish(ft_zeroed);

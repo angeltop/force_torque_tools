@@ -75,7 +75,7 @@ bool GravityCompensation::Compensate(const geometry_msgs::WrenchStamped &ft_zero
     geometry_msgs::Vector3Stamped g;
     g.vector = gravity.linear_acceleration;
     g.header = gravity.header;
-    g.header.stamp = ros::Time();
+	
 
     // convert the accelerometer reading to the F/T sensor frame
     geometry_msgs::Vector3Stamped g_ft_frame;
