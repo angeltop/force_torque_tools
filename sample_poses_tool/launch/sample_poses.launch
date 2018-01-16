@@ -1,16 +1,17 @@
 <?xml version="1.0"?>
 <launch>
 	<arg name="arm" default="right_arm"/>
-	<arg name="file_name" default="sarafun_right_poses"/>
-	
+	<arg name="file_name" default="sarafun_right_poses_abb"/>
+
 	<param name="/sample_pose/arm" value="$(arg arm)"/>
 	<param name="/sample_pose/file" value="$(arg file_name)"/>
-		
+
 	<include file="$(find sarafun_launch)/abb/motion_modules.launch">
 		<arg name="sim" value="0"/>
 		<arg name="viz" value="false"/>
+		<arg name="ext_right" value="1"/>
 	</include>
-	
+
 	<node name="sampleRViz" type="rviz" pkg="rviz" args="-d $(find sample_poses_tool)/launch/sample_rviz.rviz"/>
-	
+
 </launch>
