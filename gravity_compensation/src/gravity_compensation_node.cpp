@@ -89,7 +89,7 @@ public:
 		m_imu.header.stamp = ros::Time::now();
 		m_imu.linear_acceleration.x = 0.0;
 		m_imu.linear_acceleration.y = 0.0;
-		m_imu.linear_acceleration.z = -9.80665;
+		m_imu.linear_acceleration.z = 9.80665;
 	}
 
 	~GravityCompensationNode()
@@ -337,4 +337,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-

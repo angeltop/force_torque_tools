@@ -3,9 +3,9 @@
 
   <arg name="node_name" default="gravity_compensation"/>
   <arg name="calib_data_file" default="$(env HOME)/.ros/ft_calib/sarafun_right_arm_calib.yaml"/>
-  <arg name="ft_raw" default="/ethdaq_data_neg"/>
+  <arg name="ft_raw" default="/ethdaq_data"/>
   <arg name="imu" default="/imu/data"/>
-  <arg name="loop_rate" default="1000.0"/>
+  <arg name="loop_rate" default="250.0"/>
   <arg name="ns" default="/ft_sensor"/>
   <arg name="gripper_com_child_frame_id" default="gripper_com"/>
 

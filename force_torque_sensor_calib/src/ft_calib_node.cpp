@@ -71,8 +71,8 @@ public:
 		spinner->start();
 
 
-		
-		topicSub_ft_raw_ = n_.subscribe("/ethdaq_data_neg", 1, &FTCalibNode::topicCallback_ft_raw, this);
+
+		topicSub_ft_raw_ = n_.subscribe("/ethdaq_data", 1, &FTCalibNode::topicCallback_ft_raw, this);
 // 		topicSub_Accelerometer_ = n_.subscribe("imu", 1, &FTCalibNode::topicCallback_imu, this);
 
 		m_pose_counter = 0;
@@ -110,7 +110,7 @@ public:
 			ROS_WARN("No motion_server parameter, setting to default '/cmd_pose_server_left'");
 			m_server_name = std::string("/cmd_pose_server_left");
 		}
-		
+
 		// Get the name of output calibration file
 		if(n_.hasParam("calib_file_name"))
 		{
@@ -261,7 +261,7 @@ public:
 			pose_stamped.header.stamp = ros::Time::now();
 
 // 			m_group->setPoseTarget(pose_stamped);
-			
+
 			goal.target = pose_stamped;
 			m_motionClient_->sendGoal(goal);
 			ROS_INFO("Requesting motion %d", m_pose_counter);
@@ -273,7 +273,7 @@ public:
 			// not supported
 			ROS_ERROR("Random poses is not supported with omg!!!");
 			return false;
-			
+
 		}
 
 
@@ -433,8 +433,8 @@ public:
 		gravity.header.frame_id = "base_link";
 		gravity.vector.x = 0.0;
 		gravity.vector.y = 0.0;
-		gravity.vector.z = -9.80665;
-		
+		gravity.vector.z = 9.80665;
+
 		geometry_msgs::Vector3Stamped gravity_ft_frame;
 
 		try
@@ -531,8 +531,8 @@ private:
 	tf::TransformListener *m_tf_listener;
 
 	//	***** ROS parameters ***** //
-	
-	// motion action server name of arm 
+
+	// motion action server name of arm
 	std::string m_server_name;
 	// name of output calibration file
 	std::string m_calib_file_name;
