@@ -43,6 +43,7 @@
 #include <tf/transform_broadcaster.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <boost/thread.hpp>
+#include <std_srvs/Empty.h>
 
 
 class GravityCompensationNode
@@ -53,6 +54,7 @@ public:
 	// subscribe to accelerometer (imu) readings
 	ros::Subscriber topicSub_imu_;
 	ros::Subscriber topicSub_ft_raw_;
+	ros::ServiceServer calibrate_bias_srv_server_;
 
 	ros::Publisher topicPub_ft_zeroed_;
 	ros::Publisher topicPub_ft_compensated_;
@@ -78,13 +80,16 @@ public:
 			n_.getParam("ns", ns);
 			topicPub_ft_zeroed_ = n_.advertise<geometry_msgs::WrenchStamped> (ns+std::string("/ft_zeroed"), 1);
 			topicPub_ft_compensated_ = n_.advertise<geometry_msgs::WrenchStamped> (ns+std::string("/ft_compensated"), 1);
+			calibrate_bias_srv_server_ = n_.advertiseService(ns+std::string("/calibrate_bias"), &GravityCompensationNode::calibrateBiasSrvCallback, this);
 		}
 
 		else
 		{
 			topicPub_ft_zeroed_ = n_.advertise<geometry_msgs::WrenchStamped> ("ft_zeroed", 1);
 			topicPub_ft_compensated_ = n_.advertise<geometry_msgs::WrenchStamped> ("ft_compensated", 1);
+			calibrate_bias_srv_server_ = n_.advertiseService("calibrate_bias", &GravityCompensationNode::calibrateBiasSrvCallback, this);
 		}
+
 		m_imu.header.frame_id = "base_link";
 		m_imu.header.stamp = ros::Time::now();
 		m_imu.linear_acceleration.x = 0.0;
@@ -261,6 +266,7 @@ public:
 				ROS_ERROR("Imu reading too old, not able to g-compensate ft measurement");
 			return;
 		}
+
 		m_imu.header.stamp = ros::Time::now()-ros::Duration(0.1);
 		geometry_msgs::WrenchStamped ft_zeroed;
 		m_g_comp->Zero(*msg, ft_zeroed);
@@ -269,6 +275,28 @@ public:
 		geometry_msgs::WrenchStamped ft_compensated;
 		m_g_comp->Compensate(ft_zeroed, m_imu, ft_compensated);
 		topicPub_ft_compensated_.publish(ft_compensated);
+
+		if(m_calibrate_bias)
+		{
+			if(m_calib_measurements++ < 100)
+			{
+				m_ft_bias(0) += ft_compensated.wrench.force.x;
+				m_ft_bias(1) += ft_compensated.wrench.force.y;
+				m_ft_bias(2) += ft_compensated.wrench.force.z;
+				m_ft_bias(3) += ft_compensated.wrench.torque.x;
+				m_ft_bias(4) += ft_compensated.wrench.torque.y;
+				m_ft_bias(5) += ft_compensated.wrench.torque.z;
+			}
+
+			// set the new bias
+			if(m_calib_measurements >= 100)
+			{
+				m_ft_bias = m_ft_bias/100;
+				m_g_comp_params->setBias(m_g_comp_params->getBias() + m_ft_bias);
+				m_calibrate_bias = false;
+				m_calib_measurements = 0;
+			}
+		}
 	}
 
 	// thread function for publishing the gripper center of mass transform
@@ -293,8 +321,22 @@ public:
 		}
 	}
 
-private:
+	// only to be called when the robot is standing still and
+	// while not holding anything / applying any forces
+	bool calibrateBiasSrvCallback(std_srvs::Empty::Request &req,
+	                             std_srvs::Empty::Response &res)
+	{
+	 	m_calibrate_bias = true;
+		m_calib_measurements = 0;
+	 	m_ft_bias = Eigen::Matrix<double, 6, 1>::Zero();
+	  return true;
+	}
 
+
+private:
+	bool m_calibrate_bias;
+  unsigned int m_calib_measurements;
+  Eigen::Matrix<double, 6, 1> m_ft_bias;
 	GravityCompensationParams *m_g_comp_params;
 	GravityCompensation *m_g_comp;
 	sensor_msgs::Imu m_imu;
