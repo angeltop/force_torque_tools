@@ -259,15 +259,15 @@ public:
 			return;
 		}
 
-		if((ros::Time::now()-m_imu.header.stamp).toSec() > 0.1)
-		{
-			error_msg_count++;
-			if(error_msg_count % 10==0)
-				ROS_ERROR("Imu reading too old, not able to g-compensate ft measurement");
-			return;
-		}
+// 		if((ros::Time::now()-m_imu.header.stamp).toSec() > 0.1)
+// 		{
+// 			error_msg_count++;
+// 			if(error_msg_count % 10==0)
+// 				ROS_ERROR("Imu reading too old, not able to g-compensate ft measurement");
+// 			return;
+// 		}
 
-		m_imu.header.stamp = ros::Time::now()-ros::Duration(0.1);
+// 		m_imu.header.stamp = ros::Time::now();
 		geometry_msgs::WrenchStamped ft_zeroed;
 		m_g_comp->Zero(*msg, ft_zeroed);
 		topicPub_ft_zeroed_.publish(ft_zeroed);

@@ -81,7 +81,8 @@ bool GravityCompensation::Compensate(const geometry_msgs::WrenchStamped &ft_zero
     geometry_msgs::Vector3Stamped g_ft_frame;
     try
     {
-        m_tf_listener->transformVector(ft_zeroed.header.frame_id, g, g_ft_frame);
+		 m_tf_listener->transformVector(ft_zeroed.header.frame_id, ros::Time(0), g, g.header.frame_id, g_ft_frame);
+      //  m_tf_listener->transformVector(ft_zeroed.header.frame_id, g, g_ft_frame);
     }
 
     catch(tf::TransformException &ex)
